@@ -72,7 +72,6 @@ func MulMat(mat1 matrix, mat2 matrix) matrix {
 	for i := range mat1M {
 		for j := range mat2N {
 			sum := 0.0
-
 			for k := range mat1N {
 				sum += mat1[i][k] * mat2[k][j]
 			}
