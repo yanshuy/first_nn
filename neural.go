@@ -1,9 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"log"
 	"math"
 	"math/rand"
+	"os"
+	"strconv"
+	"strings"
 )
 
 func activationFunc(x float64) float64 {
@@ -54,7 +60,7 @@ func (nn *NeuralNetwork) train(query []float64, result []float64) {
 	target := Transpose([][]float64{result})
 
 	nn.Layers[0] = input
-	for i := range len(nn.Layers) - 1 {
+	for i := range nn.Weights {
 		result := MulMat(nn.Weights[i], nn.Layers[i])
 		nn.Layers[i+1] = result.transform(func(x float64, i, j int) float64 {
 			return activationFunc(x)
@@ -67,19 +73,23 @@ func (nn *NeuralNetwork) train(query []float64, result []float64) {
 
 	for i := len(nn.Layers) - 1; i > 0; i-- {
 		layer := nn.Layers[i]
-		prevlayer := nn.Layers[i-1]
+		prevLayer := nn.Layers[i-1]
 
-		layer_1 := layer.transform(func(x float64, i, j int) float64 { return 1.0 - x })
-		// layer_err * layer * (1.0 - layer) . prevlayer
-		weights_grads := MulMat(layer_err.Mul(layer, layer_1), Transpose(prevlayer))
+		actDeriv := layer.transform(func(x float64, _, _ int) float64 {
+			return x * (1.0 - x)
+		})
 
-		weights_T := Transpose(nn.Weights[i-1])
+		delta := layer_err.Mul(actDeriv)
 
-		nn.Weights[i-1] = weights_grads.
-			transform(func(x float64, k, j int) float64 { return nn.Weights[i-1][k][j] + (2 * x * nn.LearnRate) })
+		weights_grads := MulMat(delta, Transpose(prevLayer))
 
 		// error in prev layer
-		layer_err = MulMat(weights_T, layer_err)
+		weights_T := Transpose(nn.Weights[i-1])
+		layer_err = MulMat(weights_T, delta)
+
+		nn.Weights[i-1] = weights_grads.transform(func(x float64, k, j int) float64 {
+			return nn.Weights[i-1][k][j] + (x * nn.LearnRate)
+		})
 	}
 }
 
@@ -87,38 +97,94 @@ func (nn *NeuralNetwork) query(query []float64) []float64 {
 	input := Transpose([][]float64{query})
 	for i := range len(nn.Layers) - 1 {
 		result := MulMat(nn.Weights[i], input)
-		input = result.transform(func(x float64, i, j int) float64 {
+		input = result.transform(func(x float64, _, _ int) float64 {
 			return activationFunc(x)
 		})
 	}
 	return Transpose(input)[0]
 }
 
+type HandWrittenNum struct {
+	number  int
+	bytemap [784]uint8
+}
+
+func getData_HandWrittenNum(datafile string) []HandWrittenNum  {	
+	data := make([]HandWrittenNum, 0, 100)
+	
+	file, err := os.Open(datafile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	reader := bufio.NewReader(file)
+	for {
+		line, _, err := reader.ReadLine()
+	
+		if len(line) > 0 {
+			h := HandWrittenNum{}
+			h.number = int(line[0]) - 48
+	
+			vals := string(line[2:])
+			valsArr := strings.Split(vals, ",")
+			for i, v := range valsArr {
+				n, _ := strconv.ParseUint(v, 10, 8)
+				h.bytemap[i] = uint8(n)
+			}
+	
+			data = append(data, h)
+		}
+	
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	return data
+}
+
 func main() {
 	var nn NeuralNetwork
-	nn.init([]int{3, 3, 3}, 1)
-	fmt.Println(nn.query([]float64{1, 2, 3}))
-	for i := range 1000 {
-		if i == 500 {
-			fmt.Println(nn.query([]float64{1, 2, 3}))
-		}
-		nn.train([]float64{1, 2, 3}, []float64{0.1, 0.2, 0.3})
+	nn.init([]int{784, 100, 10}, 0.3)
+
+	data := getData_HandWrittenNum("mnist_train_100.csv")
+
+	first := data[0]
+	q := make([]float64, 784)
+	for i := range q {
+		v := first.bytemap[i]
+		q[i] = (float64(v)/255)*0.99 + 0.01
 	}
-	fmt.Println(nn.query([]float64{1, 2, 3}))
+	
+	fmt.Println(nn.query(q), first.number)
+	
+	t := make([]float64, 10)
+	
+	for _, datum := range data {
+		for j := range q {
+			v := datum.bytemap[j]
+			q[j] = (float64(v)/255)*0.99 + 0.01
+		}
+		for i := range t {
+			t[i] = 0.01
+		}
+		ans := datum.number
+		t[ans] = 0.99
 
-	// data := `7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,84,185,159,151,60,36,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,222,254,254,254,254,241,198,198,198,198,198,198,198,198,170,52,0,0,0,0,0,0,0,0,0,0,0,0,67,114,72,114,163,227,254,225,254,254,254,250,229,254,254,140,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,17,66,14,67,67,67,59,21,236,254,106,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,253,209,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,22,233,255,83,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,129,254,238,44,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,59,249,254,62,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,133,254,187,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,9,205,248,58,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,126,254,182,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,75,251,240,57,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,19,221,254,166,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,203,254,219,35,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,38,254,254,77,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,31,224,254,115,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,133,254,254,52,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,61,242,254,254,52,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,121,254,254,219,40,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,121,254,207,18,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0`
-	// dataArr := strings.Split(data, ",")
+		nn.train(q, t)
+	}
 
-	// for i,v := range dataArr[1:] {
-	// 	n,_ := strconv.Atoi(v)
-	// 	if i % 28 == 0 {
-	// 		fmt.Print("\n")
-	// 	}
-	// 	if n > 128 {
-	// 		fmt.Print("*")
-	// 	} else {
-	// 		fmt.Print(" ")
-	// 	}
-	// }
-	// fmt.Print("\n")
+	q = make([]float64, 784)
+	for i := range q {
+		v := first.bytemap[i]
+		q[i] = (float64(v)/255)*0.99 + 0.01
+	}
+
+	ans := nn.query(q)
+	for i, a := range ans {
+		fmt.Println(i, a)
+	}
 }
+
