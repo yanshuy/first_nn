@@ -109,8 +109,8 @@ type HandWrittenNum struct {
 	bytemap [784]uint8
 }
 
-func getData_HandWrittenNum(datafile string) []HandWrittenNum  {	
-	data := make([]HandWrittenNum, 0, 100)
+func getData_HandWrittenNum(datafile string, hasHeader bool) []HandWrittenNum  {	
+	data := make([]HandWrittenNum, 0, 10)
 	
 	file, err := os.Open(datafile)
 	if err != nil {
@@ -118,6 +118,9 @@ func getData_HandWrittenNum(datafile string) []HandWrittenNum  {
 	}
 
 	reader := bufio.NewReader(file)
+	if hasHeader {
+		reader.ReadLine()
+	}
 	for {
 		line, _, err := reader.ReadLine()
 	
@@ -149,20 +152,24 @@ func main() {
 	var nn NeuralNetwork
 	nn.init([]int{784, 100, 10}, 0.3)
 
-	data := getData_HandWrittenNum("mnist_train_100.csv")
+	data := getData_HandWrittenNum("mnist_train.csv", true)
+	dataTest := getData_HandWrittenNum("mnist_test_10.csv", false)
 
-	first := data[0]
+	first := dataTest[0]
 	q := make([]float64, 784)
 	for i := range q {
 		v := first.bytemap[i]
 		q[i] = (float64(v)/255)*0.99 + 0.01
+	}	
+	fmt.Println("actual", first.number)
+	ans := nn.query(q)
+	for i, a := range ans {
+		fmt.Printf("%d %0.2f\n", i, a)
 	}
 	
-	fmt.Println(nn.query(q), first.number)
-	
 	t := make([]float64, 10)
-	
 	for _, datum := range data {
+		q = make([]float64, 784)
 		for j := range q {
 			v := datum.bytemap[j]
 			q[j] = (float64(v)/255)*0.99 + 0.01
@@ -182,9 +189,10 @@ func main() {
 		q[i] = (float64(v)/255)*0.99 + 0.01
 	}
 
-	ans := nn.query(q)
+	ans = nn.query(q)
 	for i, a := range ans {
-		fmt.Println(i, a)
+		fmt.Printf("%d %0.2f\n", i, a)
 	}
+	fmt.Printf("|||||||\n%#v\n", nn.Weights)
 }
 
