@@ -1,15 +1,10 @@
 package main
 
 import (
-	"bufio"
-	"fmt"
-	"io"
-	"log"
+	"encoding/gob"
 	"math"
 	"math/rand"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func activationFunc(x float64) float64 {
@@ -20,6 +15,46 @@ type NeuralNetwork struct {
 	Layers    []matrix
 	LearnRate float64
 	Weights   []matrix
+}
+
+func (nn *NeuralNetwork) Save(filename string) error {
+    file, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    encoder := gob.NewEncoder(file)
+    err = encoder.Encode(nn.Weights)
+    if err != nil {
+        return err
+    }
+    err = encoder.Encode(nn.LearnRate)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+func (nn *NeuralNetwork) Load(filename string) error {
+    file, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    decoder := gob.NewDecoder(file)
+    err = decoder.Decode(&nn.Weights)
+    if err != nil {
+        return err
+    }
+    err = decoder.Decode(&nn.LearnRate)
+    if err != nil {
+        return err
+    }
+    
+    nn.Layers = make([]matrix, len(nn.Weights)+1)
+    return nil
 }
 
 func (nn *NeuralNetwork) init(nodesInLayers []int, learnRate float64) {
@@ -75,7 +110,7 @@ func (nn *NeuralNetwork) train(query []float64, result []float64) {
 		layer := nn.Layers[i]
 		prevLayer := nn.Layers[i-1]
 
-		actDeriv := layer.transform(func(x float64, _, _ int) float64 {
+		actDeriv := layer.transform(func(x float64, r, c int) float64 {
 			return x * (1.0 - x)
 		})
 
@@ -102,97 +137,5 @@ func (nn *NeuralNetwork) query(query []float64) []float64 {
 		})
 	}
 	return Transpose(input)[0]
-}
-
-type HandWrittenNum struct {
-	number  int
-	bytemap [784]uint8
-}
-
-func getData_HandWrittenNum(datafile string, hasHeader bool) []HandWrittenNum  {	
-	data := make([]HandWrittenNum, 0, 10)
-	
-	file, err := os.Open(datafile)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	reader := bufio.NewReader(file)
-	if hasHeader {
-		reader.ReadLine()
-	}
-	for {
-		line, _, err := reader.ReadLine()
-	
-		if len(line) > 0 {
-			h := HandWrittenNum{}
-			h.number = int(line[0]) - 48
-	
-			vals := string(line[2:])
-			valsArr := strings.Split(vals, ",")
-			for i, v := range valsArr {
-				n, _ := strconv.ParseUint(v, 10, 8)
-				h.bytemap[i] = uint8(n)
-			}
-	
-			data = append(data, h)
-		}
-	
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	return data
-}
-
-func main() {
-	var nn NeuralNetwork
-	nn.init([]int{784, 100, 10}, 0.3)
-
-	data := getData_HandWrittenNum("mnist_train.csv", true)
-	dataTest := getData_HandWrittenNum("mnist_test_10.csv", false)
-
-	first := dataTest[0]
-	q := make([]float64, 784)
-	for i := range q {
-		v := first.bytemap[i]
-		q[i] = (float64(v)/255)*0.99 + 0.01
-	}	
-	fmt.Println("actual", first.number)
-	ans := nn.query(q)
-	for i, a := range ans {
-		fmt.Printf("%d %0.2f\n", i, a)
-	}
-	
-	t := make([]float64, 10)
-	for _, datum := range data {
-		q = make([]float64, 784)
-		for j := range q {
-			v := datum.bytemap[j]
-			q[j] = (float64(v)/255)*0.99 + 0.01
-		}
-		for i := range t {
-			t[i] = 0.01
-		}
-		ans := datum.number
-		t[ans] = 0.99
-
-		nn.train(q, t)
-	}
-
-	q = make([]float64, 784)
-	for i := range q {
-		v := first.bytemap[i]
-		q[i] = (float64(v)/255)*0.99 + 0.01
-	}
-
-	ans = nn.query(q)
-	for i, a := range ans {
-		fmt.Printf("%d %0.2f\n", i, a)
-	}
-	fmt.Printf("|||||||\n%#v\n", nn.Weights)
 }
 
