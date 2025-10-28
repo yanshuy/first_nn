@@ -96,29 +96,29 @@ func main() {
 		fmt.Println("Loaded existing model from", modelFile)
 	}
 
-	dataTest := getData_HandWrittenNum("mnist_test_10.csv", false)
+	dataTest := getData_HandWrittenNum("mnist_train.csv", false)
 
 	correct := 0
 	total := 0
 	for _, datum := range dataTest {
 		q := make([]float64, 784)
-		fmt.Println("image for ans", datum.number)
+		// fmt.Println("image for ans", datum.number)
 		for i := range q {
 			v := datum.bytemap[i]
 			q[i] = (float64(v)/255)*0.99 + 0.01
 
-			if i % 28 == 0 {
-				fmt.Print("\n")
-			}
-			if v > 200 {
-				fmt.Print("@")
-			} else if v > 120 {
-				fmt.Print("c")
-			} else {
-				fmt.Print(" ")
-			}
+			// if i % 28 == 0 {
+			// 	fmt.Print("\n")
+			// }
+			// if v > 200 {
+			// 	fmt.Print("@")
+			// } else if v > 120 {
+			// 	fmt.Print("c")
+			// } else {
+			// 	fmt.Print(" ")
+			// }
 		}
-		fmt.Print("\n")
+		// fmt.Print("\n")
 
 		ans := nn.query(q)
 
@@ -128,10 +128,10 @@ func main() {
 			correct++
 		}
 		total++
-		for i, a := range ans {
-			fmt.Printf("%d %.2f\n", i, a)
-		}
-		fmt.Print("\n")
+		// for i, a := range ans {
+		// 	fmt.Printf("%d %.2f\n", i, a)
+		// }
+		// fmt.Print("\n")
 	}
 	fmt.Println(correct, "out of", total)
 }

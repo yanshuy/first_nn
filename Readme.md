@@ -1,3 +1,5 @@
+# Model accuracy 95.38%
+
 ## My Run
 /# go run .
 
