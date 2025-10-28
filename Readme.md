@@ -2,6 +2,7 @@
 /# go run .
 
 Loaded existing model from neural_network.gob
+
 image for ans 7
 
 
